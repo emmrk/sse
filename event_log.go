@@ -5,14 +5,47 @@
 package sse
 
 import (
+	"container/list"
 	"strconv"
+	"sync"
 	"time"
 )
 
-// EventLog holds all of previous events
-type EventLog []*Event
+// EventLog holds unexpired previous events
+type EventLog struct {
+	sync.RWMutex
+	events   *list.List
+	ticker   time.Ticker
+	eventTTL time.Duration
+}
 
-// Add event to eventlog
+// NewEventLog creates a new Event Log.
+//
+// EventTTL determines for how long the event is considered valid. Valid events
+// will be replayed for newly joined clients. Expired events are periodically
+// removed from the log to save space if EventTTL != 0. To preserve backwards
+// compatibility, with EventTTL == 0 all events ever published on a given
+// stream are forever retained and replayed, bevare of the balooning memory as
+// a result.
+func NewEventLog(eventTTL time.Duration) *EventLog {
+	e := &EventLog{
+		events:   list.New(),
+		eventTTL: eventTTL,
+	}
+
+	if eventTTL > 0 {
+		ticker := time.NewTicker(3 * eventTTL)
+
+		go func() {
+			<-ticker.C
+			e.CleanUp()
+		}()
+	}
+
+	return e
+}
+
+// Add event to EventLog
 func (e *EventLog) Add(ev *Event) {
 	if !ev.hasContent() {
 		return
@@ -20,24 +53,65 @@ func (e *EventLog) Add(ev *Event) {
 
 	ev.ID = []byte(e.currentindex())
 	ev.timestamp = time.Now()
-	*e = append(*e, ev)
+
+	if e.eventTTL > 0 {
+		e.Lock()
+		e.events.PushBack(ev)
+		e.Unlock()
+	} else {
+		e.events.PushBack(ev)
+	}
 }
 
-// Clear events from eventlog
+// Clear removes all events from the Event Log
 func (e *EventLog) Clear() {
-	*e = nil
+	e.Lock()
+	e.events = list.New()
+	e.Unlock()
 }
 
-// Replay events to a subscriber
+// CleanUp removes expired events immediately
+func (e *EventLog) CleanUp() {
+	e.Lock()
+	defer e.Unlock()
+	for element := e.events.Front(); element != nil; element = element.Next() {
+		event, ok := element.Value.(*Event)
+		if !ok {
+			continue
+		}
+
+		if time.Now().Sub(event.timestamp) > e.eventTTL {
+			e.events.Remove(element)
+		} else {
+			break
+		}
+	}
+}
+
+// Replay plays unexpired previous events to a subscriber
 func (e *EventLog) Replay(s *Subscriber) {
-	for i := 0; i < len(*e); i++ {
-		id, _ := strconv.Atoi(string((*e)[i].ID))
+	e.RLock()
+	defer e.RUnlock()
+
+	for element := e.events.Front(); element != nil; element = element.Next() {
+		event, ok := element.Value.(*Event)
+		if !ok {
+			continue
+		}
+
+		id, _ := strconv.Atoi(string(event.ID))
 		if id >= s.eventid {
-			s.connection <- (*e)[i]
+			if e.eventTTL == 0 {
+				s.connection <- event
+			} else if time.Now().Sub(event.timestamp) <= e.eventTTL {
+				s.connection <- event
+			}
 		}
 	}
 }
 
 func (e *EventLog) currentindex() string {
-	return strconv.Itoa(len(*e))
+	e.RLock()
+	defer e.RUnlock()
+	return strconv.Itoa(e.events.Len())
 }

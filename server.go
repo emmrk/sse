@@ -19,6 +19,8 @@ type Server struct {
 	Headers map[string]string
 	// Sets a ttl that prevents old events from being transmitted
 	EventTTL time.Duration
+	// Max messages stored for replaying per stream, measured in items
+	MaxCapacity int
 	// Specifies the size of the message buffer for each stream
 	BufferSize int
 	// Encodes all data as base64
@@ -82,7 +84,7 @@ func (s *Server) CreateStream(id string) *Stream {
 		return s.streams[id]
 	}
 
-	str := newStream(id, s.BufferSize, s.AutoReplay, s.AutoStream, s.OnSubscribe, s.OnUnsubscribe)
+	str := newStream(id, s.BufferSize, s.EventTTL, s.AutoReplay, s.AutoStream, s.OnSubscribe, s.OnUnsubscribe)
 	str.run()
 
 	s.streams[id] = str
