@@ -12,7 +12,7 @@ import (
 )
 
 func TestEventLog(t *testing.T) {
-	ev := NewEventLog(1*time.Second)
+	ev := NewEventLog(1*time.Second, 1024)
 	testEvent := &Event{Data: []byte("test")}
 
 	ev.Add(testEvent)
@@ -24,4 +24,29 @@ func TestEventLog(t *testing.T) {
 	ev.Add(testEvent)
 
 	assert.Equal(t, 2, ev.events.Len())
+}
+
+func TestEventLogMaxCapacity(t *testing.T) {
+	ev := NewEventLog(10*time.Second, 3)
+	testEvent := &Event{Data: []byte("test")}
+
+	ev.Add(testEvent)
+	ev.Add(testEvent)
+	ev.Add(testEvent)
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, 3, ev.events.Len())
+
+	ev.Add(testEvent)
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, 3, ev.events.Len())
+
+	ev.Add(testEvent)
+	ev.Add(testEvent)
+	ev.Add(testEvent)
+	ev.Add(testEvent)
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, 3, ev.events.Len())
 }

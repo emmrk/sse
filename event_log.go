@@ -17,6 +17,7 @@ type EventLog struct {
 	events   *list.List
 	ticker   time.Ticker
 	eventTTL time.Duration
+	maxCap   int
 }
 
 // NewEventLog creates a new Event Log.
@@ -27,10 +28,17 @@ type EventLog struct {
 // compatibility, with EventTTL == 0 all events ever published on a given
 // stream are forever retained and replayed, bevare of the balooning memory as
 // a result.
-func NewEventLog(eventTTL time.Duration) *EventLog {
+//
+// MaxCapacity is a soft limit on the number of entries in the Event Log.
+// Filling the Event Log up to MaxCapacity will trigger an unscheduled removal
+// of expired entries; if that is not enough, the oldest entry in the Event Log
+// will be deleted to free up the space. MaxCapacity == 0 means unlimited
+// capacity.
+func NewEventLog(eventTTL time.Duration, maxCapacity int) *EventLog {
 	e := &EventLog{
 		events:   list.New(),
 		eventTTL: eventTTL,
+		maxCap:   maxCapacity,
 	}
 
 	if eventTTL > 0 {
@@ -51,15 +59,27 @@ func (e *EventLog) Add(ev *Event) {
 		return
 	}
 
-	ev.ID = []byte(e.currentindex())
 	ev.timestamp = time.Now()
 
-	if e.eventTTL > 0 {
-		e.Lock()
-		e.events.PushBack(ev)
-		e.Unlock()
-	} else {
-		e.events.PushBack(ev)
+	e.Lock()
+	defer e.Unlock()
+
+	ev.ID = []byte(e.currentindex())
+	e.events.PushBack(ev)
+
+	if e.maxCap != 0 && e.events.Len() >= e.maxCap {
+		go func() {
+			e.Lock()
+
+			// clean up expired events
+			e.cleanUpUnlocked()
+			// this is still not enough, remove the oldest element
+			if e.events.Len() > e.maxCap {
+				e.events.Remove(e.events.Front())
+			}
+
+			e.Unlock()
+		}()
 	}
 }
 
@@ -73,7 +93,11 @@ func (e *EventLog) Clear() {
 // CleanUp removes expired events immediately
 func (e *EventLog) CleanUp() {
 	e.Lock()
-	defer e.Unlock()
+	e.cleanUpUnlocked()
+	e.Unlock()
+}
+
+func (e *EventLog) cleanUpUnlocked() {
 	for element := e.events.Front(); element != nil; element = element.Next() {
 		event, ok := element.Value.(*Event)
 		if !ok {
@@ -111,7 +135,5 @@ func (e *EventLog) Replay(s *Subscriber) {
 }
 
 func (e *EventLog) currentindex() string {
-	e.RLock()
-	defer e.RUnlock()
 	return strconv.Itoa(e.events.Len())
 }

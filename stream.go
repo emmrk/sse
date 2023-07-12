@@ -32,7 +32,7 @@ type Stream struct {
 }
 
 // newStream returns a new stream
-func newStream(id string, buffSize int, eventTTL time.Duration, replay, isAutoStream bool, onSubscribe, onUnsubscribe func(string, *Subscriber)) *Stream {
+func newStream(id string, buffSize int, eventTTL time.Duration, maxCapacity int, replay, isAutoStream bool, onSubscribe, onUnsubscribe func(string, *Subscriber)) *Stream {
 	return &Stream{
 		ID:            id,
 		AutoReplay:    replay,
@@ -42,7 +42,7 @@ func newStream(id string, buffSize int, eventTTL time.Duration, replay, isAutoSt
 		deregister:    make(chan *Subscriber),
 		event:         make(chan *Event, buffSize),
 		quit:          make(chan struct{}),
-		Eventlog:      NewEventLog(eventTTL),
+		Eventlog:      NewEventLog(eventTTL, maxCapacity),
 		OnSubscribe:   onSubscribe,
 		OnUnsubscribe: onUnsubscribe,
 	}
