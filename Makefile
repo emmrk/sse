@@ -11,6 +11,9 @@ lint:
 test:
 	go test -count=1 -race -v ./... --cover
 
+benchmark:
+	go test -count=1 -bench=. -run "Benchmark"
+
 integration-test:
 	go run -C ./tests -race .
 

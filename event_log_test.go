@@ -50,3 +50,14 @@ func TestEventLogMaxCapacity(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	assert.Equal(t, 3, ev.events.Len())
 }
+
+func BenchmarkEventLogMaxCapacity(b *testing.B) {
+	ev := NewEventLog(100*time.Second, 100)
+	testEvent := &Event{Data: []byte("test")}
+
+	b.RunParallel(func (pb *testing.PB) {
+		for pb.Next() {
+			ev.Add(testEvent)
+		}
+	})
+}
