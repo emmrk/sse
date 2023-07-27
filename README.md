@@ -4,15 +4,11 @@
 
 SSE is a client/server implementation for Server Sent Events for Golang.
 
-## Build status
-
-* Master: [![CircleCI  Master](https://circleci.com/gh/r3labs/sse.svg?style=svg)](https://circleci.com/gh/r3labs/sse)
-
 ## Quick start
 
 To install:
 ```
-go get github.com/r3labs/sse/v2
+go get github.com/emmrk/sse/v2
 ```
 
 To Test:
@@ -170,13 +166,7 @@ func main() {
 
 ## Contributing
 
-Please read through our
-[contributing guidelines](CONTRIBUTING.md).
-Included are directions for opening issues, coding standards, and notes on
-development.
-
-Moreover, if your pull request contains patches or features, you must include
-relevant unit tests.
+Contributions welcome, please be constructive.
 
 ## Versioning
 
