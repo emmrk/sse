@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // Stream ...
@@ -19,7 +20,7 @@ type Stream struct {
 	register        chan *Subscriber
 	deregister      chan *Subscriber
 	subscribers     []*Subscriber
-	Eventlog        EventLog
+	Eventlog        *EventLog
 	subscriberCount int32
 	// Enables replaying of eventlog to newly added subscribers
 	AutoReplay   bool
@@ -31,7 +32,7 @@ type Stream struct {
 }
 
 // newStream returns a new stream
-func newStream(id string, buffSize int, replay, isAutoStream bool, onSubscribe, onUnsubscribe func(string, *Subscriber)) *Stream {
+func newStream(id string, buffSize int, eventTTL time.Duration, maxCapacity int, replay, isAutoStream bool, onSubscribe, onUnsubscribe func(string, *Subscriber)) *Stream {
 	return &Stream{
 		ID:            id,
 		AutoReplay:    replay,
@@ -41,7 +42,7 @@ func newStream(id string, buffSize int, replay, isAutoStream bool, onSubscribe, 
 		deregister:    make(chan *Subscriber),
 		event:         make(chan *Event, buffSize),
 		quit:          make(chan struct{}),
-		Eventlog:      make(EventLog, 0),
+		Eventlog:      NewEventLog(eventTTL, maxCapacity),
 		OnSubscribe:   onSubscribe,
 		OnUnsubscribe: onUnsubscribe,
 	}
