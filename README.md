@@ -2,7 +2,9 @@
 
 ## Synopsis
 
-SSE is a client/server implementation for Server Sent Events for Golang.
+This is a server and client implementation of [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) for Golang.
+
+The package is a fork of https://pkg.go.dev/github.com/r3labs/sse/v2. I use it in a couple projects and intend to maintain and update it with the fixes that I need. Backward compatibility will be kept for v2. Contributions welcome.
 
 ## Quick start
 
